@@ -66,8 +66,7 @@ class SceneClassifier(torch.nn.Module):
             except BaseException:
                 img = batch
 
-                logits = self.model(img)
-                probs = self.softmax(logits)
-                predicted_labels = torch.argmax(probs, dim=1)
+                output = self.model(img)
+                predicted_labels = torch.argmax(output, dim=1)
 
                 return predicted_labels
