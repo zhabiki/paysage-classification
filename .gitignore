@@ -1,4 +1,6 @@
 **/__pycache__
 *.pyc
 
-*.pt
+models/*
+data/*
+!data/labels.txt # Названия классов по умолчанию

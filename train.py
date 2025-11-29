@@ -5,7 +5,8 @@ from tqdm import tqdm
 
 from preprocess import SceneDataset
 from classifier import SceneClassifier
-from splitter import Sample
+from samples import Sample
+
 
 def model_train(
     samples_train: list[Sample],
@@ -21,14 +22,12 @@ def model_train(
     dataset_train = SceneDataset(
         samples_train,
         path_images,
-        labels,
         transforms
     )
-    # TODO: Реализовать логику для eval!
+
     dataset_eval = SceneDataset(
         samples_eval,
         path_images,
-        labels,
         transforms
     )
 
@@ -36,25 +35,38 @@ def model_train(
     model.train()
 
     # Формируем из датасета батчи
-    batched_dataset_train = DataLoader(dataset_train, batch_size, shuffle=False)
-    batched_dataset_eval = DataLoader(dataset_eval, batch_size, shuffle=False)
+    batched_dataset_train = DataLoader(dataset_train, batch_size, shuffle=True)
+    batched_dataset_eval = DataLoader(dataset_eval, batch_size, shuffle=True)
 
     for epoch in range(epochs):
         print(f'Эпоха {epoch + 1} / {epochs}...')
         epoch_acc = []
 
-        batched_dataset_train_with_progress_bar = tqdm(
-            batched_dataset_train, unit=f'батч по {batch_size}'
+        batched_dataset_train_progress = tqdm(
+            batched_dataset_train, unit=f' Б по {batch_size}'
         )
         
         # Проходимся по батчам --
         # вся логика обучения и классификации реализована внутри модели
-        for images, labels in batched_dataset_train_with_progress_bar:
-            output = model({'images': images, 'labels': labels})
-            epoch_acc.append(output)
+        for images, labels in batched_dataset_train_progress:
+            acc = model({'images': images, 'labels': labels})
+            epoch_acc.append(acc)
 
-            batched_dataset_train_with_progress_bar.set_postfix(
-                Точность=f'{int(output * 100) / 100}'
+            batched_dataset_train_progress.set_postfix(
+                Точность=f'{int(acc * 100) / 100}'
             )
+        
+        # Переходим к эвалюации...
+        model.eval()
+
+        eval_acc = []
+        for images, labels in batched_dataset_eval:
+            acc = model({'images': images, 'labels': labels, 'eval': True})
+            eval_acc.append(acc)
+
+        print(f'Точность после эвалюации: {np.mean(eval_acc)}\n')
+
+        # ...и обратно в трейн
+        model.train()
     
     return model

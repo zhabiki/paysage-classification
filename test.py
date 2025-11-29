@@ -1,11 +1,10 @@
 from pathlib import Path
-from typing import List
-from torch import Tensor
 from torch.utils.data import DataLoader
 from tqdm import tqdm
+from sklearn import metrics
 
 from preprocess import SceneDataset
-from splitter import Sample
+from samples import Sample
 
 
 def model_test(
@@ -14,31 +13,48 @@ def model_test(
     path_images: Path,
     transforms,
     batch_size: int = 256
-) -> List[Tensor]:
+) -> tuple[list[int], list[int]]:
                
     # Создаём экземпляры датасета и модели
-    dataset = SceneDataset(
+    dataset_test = SceneDataset(
         samples_test,
         path_images,
-        {}, # В тестовом режиме названия меток не нужны
         transforms,
     )
 
     model.test()
 
     # Формируем из датасета батчи
-    batched_dataset = DataLoader(dataset, batch_size)
+    batched_dataset_test = DataLoader(dataset_test, batch_size, shuffle=False)
 
-    predictions = []
+    # images = [data for data in batched_dataset_test]
+    classes_true = []
+    classes_pred = []
 
-    batched_dataset_with_progress_bar = tqdm(
-        batched_dataset, unit=f'батч по {batch_size}'
+    batched_dataset_progress = tqdm(
+        batched_dataset_test, unit=f' Б по {batch_size}'
     )
         
     # Проходимся по батчам
-    for img in batched_dataset_with_progress_bar:
-        img = img.to(model.device)
+    for images, labels in batched_dataset_progress:
+        preds = model.predict(images)
 
-        predictions.append(model(img))
+        classes_true.extend(preds.tolist())
+        classes_pred.extend(labels.tolist())
 
-    return predictions
+    return classes_true, classes_pred
+
+
+def show_metrics(
+    pred: list[int],
+    true: list[int],
+    labels: dict[int, str]
+) -> None:
+    pred_labelled = list(map(lambda cls: labels.get(cls) or str(cls), pred))
+    true_labelled = list(map(lambda cls: labels.get(cls) or str(cls), true))
+
+    cm = metrics.confusion_matrix(true_labelled, pred_labelled)
+    cr = metrics.classification_report(true_labelled, pred_labelled)
+
+    print('\nМатрица ошибок: \n', cm)
+    print('\nТочность по классам: \n', cr)

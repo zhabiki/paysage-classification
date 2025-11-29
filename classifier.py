@@ -2,6 +2,7 @@ import torchvision as tv
 import torch
 from tqdm import tqdm
 
+
 class SceneClassifier(torch.nn.Module):
     def __init__(self, total_epochs, n_classes):
         super().__init__()
@@ -26,24 +27,25 @@ class SceneClassifier(torch.nn.Module):
     def toggle_mode(self):
         self.mode = 'test' if self.mode == 'train' else 'train'
 
-    def train(self): # type: ignore
-        self.mode = 'train'
+    def train(self, is_eval = False): # type: ignore
+        self.mode = 'train' if not is_eval else 'eval'
+    
+    def eval(self): # type: ignore
+        self.mode = 'eval'
     
     def test(self): # type: ignore
         self.mode = 'test'
 
     def forward(self, batch):
-        if self.mode == 'train':
-            self.optimizer.zero_grad()
+        images = batch['images'].to(self.device)
+        labels = batch['labels'].to(self.device)
 
-            images  = batch['images'].to(self.device)
-            labels = batch['labels'].to(self.device)
+        if self.mode == 'train':
+            self.optimizer.zero_grad() # Обнуляем прошлые градиенты
 
             output = self.model(images)
-            loss = self.criterion(
-                output.float(),
-                torch.tensor(labels).long()
-            )
+            labels = labels.long()
+            loss = self.criterion(output, labels)
             loss.backward()
 
             self.optimizer.step()
@@ -52,12 +54,11 @@ class SceneClassifier(torch.nn.Module):
             accuracy = (torch.argmax(output, dim=1) == labels).sum().item() / len(labels)
             return accuracy
 
-        elif self.mode == 'test':
+        elif self.mode in ['eval', 'test']:
             try:
-                images = batch['images'].to(self.device)
-                labels = batch['labels'].to(self.device)
-
                 logits = self.model(images)
+
+                # Выполняем нормализацию значений и выбираем наибольшее
                 probas = torch.nn.functional.softmax(logits)
                 predicted_labels = torch.argmax(probas, dim=1)
 
@@ -70,3 +71,16 @@ class SceneClassifier(torch.nn.Module):
 
                 predicted_labels = torch.argmax(output, dim=1)
                 return predicted_labels
+
+    def predict(self, images):
+        self.model.eval()
+        images = images.to(self.device)
+
+        with torch.no_grad():
+            logits = self.model(images)
+
+            # Выполняем нормализацию значений и выбираем наибольшее
+            probas = torch.nn.functional.softmax(logits, dim=1)
+            preds = torch.argmax(probas, dim=1)
+
+        return preds.cpu()

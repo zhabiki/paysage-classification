@@ -7,6 +7,15 @@ class Sample(TypedDict):
     label: str
 
 
+def read_samples(
+    path_to_data: Path,
+) -> list[Sample]:
+    df = pd.read_csv(str(path_to_data))
+    samples = df.to_dict(orient='records')
+
+    return samples # type: ignore
+
+
 def create_splits(
     path_to_data: Path,
     ratio: str,
@@ -35,12 +44,12 @@ def read_splits(
     chosen_splits: list[str],
     path_to_save: str
 ) -> list[list[Sample]]:
-    result = []
+    samples = []
 
     # Разрешённые названия сплитов -- "train", "eval", "test"
     for split in chosen_splits:
         df = pd.read_csv(f'{path_to_save}{split}.csv')
         # print(df.to_dict(orient='records'))
-        result.append(df.to_dict(orient='records'))
+        samples.append(df.to_dict(orient='records'))
 
-    return result
+    return samples
