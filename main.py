@@ -9,23 +9,26 @@ from samples import read_samples, read_splits, create_splits
 from test import model_test, show_metrics
 from train import model_train
 from visualize import visualize
+from inference import inference
 
 
 @click.command()
 @click.option('--mode', required=True, type=click.Choice([
-    'train', 'test', 'visualize' # Тренировка, тестирование, визуализация датасета
+    'train', 'test', 'visualize', 'inference' # Тренировка, тестирование, визуализация, инференс
 ]), help='Режим работы')
-@click.option('--e', default=20, show_default=True, help='Количество эпох обучения')
+@click.option('--e', default=100, show_default=True, help='Кол-во эпох (обучение прервётся, если точность не растёт >10 эпох)')
 @click.option('--bs', default=256, show_default=True, help='Размер батча')
-@click.option('--ss', default=150, show_default=True, help='Размер стороны изображения')
+@click.option('--ss', default=88, show_default=True, help='Размер стороны изображения')
 @click.option('--path-labels', default='data/labels.txt', help='Путь до файла с названиями классов')
 @click.option('--path-splits', default='data/', help='Путь до CSVшек с выборками train-eval-test')
-@click.option('--path-checkpoint', default='models/', help='Путь до модели (при test), либо место сохранения оной (при train)')
+@click.option('--path-checkpoint', default='models/', help='Путь до модели (при test) либо место сохранения оной (при train)')
+@click.option('--path-infers', default='pred/', help='Путь до папки с картинками для предсказывания (при inference)')
 @click.option('--dataset-name', default='nitishabharathi/scene-classification', help='Название датасета на KaggleHub')
 @click.option('--dataset-splits', default='0.7-0.2-0.1', help='Как разделить датасет (три числа от 0 до 1 через дефис)')
 def run(
     mode, e, bs, ss, # Epochs, BatchSize, SampleSize
-    path_labels, path_splits, path_checkpoint, dataset_name, dataset_splits
+    path_labels, path_splits, path_checkpoint, path_infers,
+    dataset_name, dataset_splits
 ):
     # Для начала, скачем датасет! Если оный уже был скачан,
     # KaggleHub сам определит это и ничего перекачивать не будет.
@@ -55,8 +58,7 @@ def run(
 
 
     if mode == 'train':
-        # Читаем CSV-шку со сплитами на train-eval-test,
-        # либо создаём её с нуля, если таковой не существует
+        # Обучаем с нуля модель и сохраняем чек-поинты
         try:
             [train_samples, eval_samples] = read_splits(['train', 'eval'], path_splits)
         except:
@@ -64,7 +66,6 @@ def run(
             create_splits(path_csv, dataset_splits, path_splits)
             [train_samples, eval_samples] = read_splits(['train', 'eval'], path_splits)
 
-        # Обучаем с нуля модель и сохраняем чек-поинты
         model = model_train(
             train_samples,
             eval_samples,
@@ -76,15 +77,14 @@ def run(
         )
 
         model_date = datetime.now().strftime("%y%m%d")
-        model_name = f'{path_checkpoint}_{model_date}-{e}-{bs}-{ss}.pt'
+        model_name = f'{path_checkpoint}{model_date}-{e}-{bs}-{ss}.pt'
 
         torch.save(model, model_name)
         print('Обучение завершено!')
 
 
     elif mode == 'test':
-        # Читаем CSV-шку со сплитами данных на train-eval-test,
-        # либо создаём её с нуля, если таковой не существует
+        # Загружаем модель и прогоняем на тестовых данных
         try:
             [test_samples] = read_splits(['test'], path_splits)
         except:
@@ -92,7 +92,6 @@ def run(
             create_splits(path_csv, dataset_splits, path_splits)
             [test_samples] = read_splits(['test'], path_splits)
 
-        # Загружаем модель и прогоняем на тестовых данных
         model = torch.load(path_checkpoint, weights_only=False)
 
         true, pred = model_test(
@@ -115,6 +114,22 @@ def run(
             labels_list,
             transform_list
         )
+    
+
+    else:
+        # В остальных случаях -- просто выполняем инференс
+        image_pathes = [file for file in Path(path_infers).iterdir() if file.is_file()]
+
+        model = torch.load(path_checkpoint, weights_only=False)
+
+        for image_path in image_pathes:
+            inference(
+                model,
+                image_path,
+                labels_list,
+                transform_list,
+                output='mpl'
+            )
 
 
 if __name__ == '__main__':

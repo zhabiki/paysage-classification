@@ -7,39 +7,57 @@ from torch.utils.data import Dataset
 from samples import Sample
 
 
+def process_image(
+    path_image: Path,
+    transforms: Callable
+):
+    try:
+        with Image.open(path_image) as img:
+            img_rgb = img.convert('RGB')
+
+            # Масштабируем изображение для лучшей сходимости
+            img_array = np.array(img_rgb) / 255.0
+
+            # Применяем трансформации, включая перевод в тензор
+            img_tensor = transforms(img_array).float()
+
+            return img_tensor
+
+    except Exception:
+        print(f'Не удалось загрузить картинку "{path_image}"!')
+        return None
+
+
 class SceneDataset(Dataset):
     def __init__(
             self,
             samples: list[Sample],
-            images_path: Path,
-            transforms: Callable,
+            path_images: Path,
+            transforms: Callable
         ):
         self.transforms = transforms
-        self.images_path = images_path
+        self.path_images = path_images
 
         # Запускаем предобработку изображений
         self.preprocess_samples(samples)
 
     def load_sample(self, sample):
         # Соединяем переданную папку с названием файла в датафрейме
-        file_path = self.images_path / sample['image_name']
+        path_image = self.path_images / sample['image_name']
 
-        with Image.open(file_path) as img:
-            img_rgb = img.convert('RGB')
+        tensor = process_image(path_image, self.transforms)
 
-            # Масштабируем изображение для лучшей сходимости
-            img_array = np.array(img_rgb) / 255.0
-
-            # Переводим изображение в тензор
-            img_tensor = self.transforms(img_array).float()
-
-            return (img_tensor, int(sample['label']))
+        return (tensor, int(sample['label']))
     
     def preprocess_samples(self, samples):
         # Создаём список сэмплов (картинка + метка);
         # Нам нужен список кортежей. Кортеж -- пара тензор-метка
         img_list = list(
             map(lambda sample: self.load_sample(sample), samples)
+        )
+
+        img_list = list(
+            filter(lambda tensor: tensor is not None, img_list)
         )
 
         self.__dataset = img_list

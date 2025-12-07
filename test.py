@@ -19,7 +19,7 @@ def model_test(
     dataset_test = SceneDataset(
         samples_test,
         path_images,
-        transforms,
+        transforms
     )
 
     model.test()
@@ -37,7 +37,7 @@ def model_test(
         
     # Проходимся по батчам
     for images, labels in batched_dataset_progress:
-        preds = model.predict(images)
+        (preds, _) = model.predict(images)
 
         classes_true.extend(preds.tolist())
         classes_pred.extend(labels.tolist())
