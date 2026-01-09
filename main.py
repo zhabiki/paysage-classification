@@ -3,7 +3,6 @@ from datetime import datetime
 from pathlib import Path
 from test import model_test, show_metrics
 
-import click
 import hydra
 import kagglehub
 import torch
@@ -18,56 +17,10 @@ from visualize import visualize
 log = logging.getLogger(__name__)
 
 
-# @click.command()
-# @click.option(
-#     '--params["mode"]',
-#     required=True,
-#     type=click.Choice(
-#         [
-#             'train',
-#             'test',
-#             'visualize',
-#             'inference',  # Тренировка, тестирование, визуализация, инференс
-#         ]
-#     ),
-#     help='Режим работы',
-# )
-# @click.option(
-#     '--params["e"]',
-#     default=100,
-#     show_default=True,
-#     help='Кол-во эпох (обучение прервётся, если точность не растёт >10 эпох)',
-# )
-# @click.option('--params["bs"]', default=256, show_default=True, help='Размер батча')
-# @click.option('--params["ss"]', default=88, show_default=True, help='Размер стороны изображения')
-# @click.option(
-#     '--path-labels',
-#     default='data/labels.txt',
-#     help='Путь до файла с названиями классов',
-# )
-# @click.option(
-#     '--path-splits', default='data/', help='Путь до CSVшек с выборками train-eval-test'
-# )
-# @click.option(
-#     '--path-checkpoint',
-#     default='models/',
-#     help='Путь до модели (при test) либо место сохранения оной (при train)',
-# )
-# @click.option(
-#     '--path-infers',
-#     default='pred/',
-#     help='Путь до картинки или каталога для предсказывания (при inference)',
-# )
-# @click.option(
-#     '--dataset-name',
-#     default='nitishabharathi/scene-classification',
-#     help='Название датасета на KaggleHub',
-# )
-# @click.option(
-#     '--dataset-splits',
-#     default='0.7-0.2-0.1',
-#     help='Как разделить датасет (три числа от 0 до 1 через дефис)',
-# )
+def model_name_format(path_checkpoint, model_date, e, bs, ss):
+    return f'{path_checkpoint}{model_date}-{e}-{bs}-{ss}.pt'
+
+
 @hydra.main(version_base=None, config_path='config', config_name='config')
 def run(
     # mode,
@@ -134,7 +87,13 @@ def run(
         )
 
         model_date = datetime.now().strftime('%y%m%d')
-        model_name = f'{params["path-checkpoint"]}{model_date}-{params["e"]}-{params["bs"]}-{params["ss"]}.pt'
+        model_name = model_name_format(
+            params["path-checkpoint"],
+            model_date,
+            params["e"],
+            params["bs"],
+            params["ss"],
+        )
 
         torch.save(model, model_name)
         print('Обучение завершено!')
