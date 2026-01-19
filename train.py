@@ -3,6 +3,8 @@ from pathlib import Path
 
 import numpy as np
 from torch.utils.data import DataLoader
+from torch.utils.tensorboard.writer import SummaryWriter
+from torchvision.utils import make_grid
 from tqdm import tqdm
 
 from classifier import SceneClassifier
@@ -18,7 +20,11 @@ def model_train(
     transforms,
     epochs: int = 20,
     batch_size: int = 256,
-) -> SceneClassifier:
+    samples_size: int = 88,
+) -> tuple[SceneClassifier, float, int]:
+    # Инициализируем тензорборд
+    writer = SummaryWriter()
+
     # Создаём экземпляры датасетов и модели
     dataset_train = SceneDataset(samples_train, path_images, transforms)
 
@@ -38,49 +44,81 @@ def model_train(
     best_acc = 0.0
     best_epoch = 0
     best_param = None
-    for epoch in range(epochs):
-        print(f'Эпоха {epoch + 1} / {epochs}...')
-        epoch_acc = []
 
-        batched_dataset_train_progress = tqdm(
-            batched_dataset_train, unit=f' Б по {batch_size}'
-        )
+    try:
+        for epoch in range(epochs):
+            print(f'Эпоха {epoch + 1} / {epochs}...')
+            train_acc = []
+            train_l = []
 
-        # Проходимся по батчам --
-        # вся логика обучения и классификации реализована внутри модели
-        for images, labels in batched_dataset_train_progress:
-            acc = model({'images': images, 'labels': labels})
-            epoch_acc.append(acc)
-
-            batched_dataset_train_progress.set_postfix(
-                Точность=f'{int(acc * 100) / 100}'
+            batched_dataset_train_progress = tqdm(
+                batched_dataset_train, unit=f' Б по {batch_size}'
             )
 
-        # Переходим к эвалюации...
-        model.eval()
+            # Проходимся по батчам --
+            # вся логика обучения и классификации реализована внутри модели
+            for images, labels in batched_dataset_train_progress:
+                train_res = model({'images': images, 'labels': labels})
+                train_acc.append(train_res[1])
+                train_l.append(train_res[0].item())
 
-        eval_acc = []
-        for images, labels in batched_dataset_eval:
-            acc = model({'images': images, 'labels': labels, 'eval': True})
-            eval_acc.append(acc)
-        print(f'Точность после эвалюации: {np.mean(eval_acc)} (лучшая: {best_acc})\n')
+                grid = make_grid(images)
+                writer.add_image('latest_batch/train', grid, 0)
 
-        # ...и обратно в трейн
-        model.train()
-        model.scheduler.step()
+                batched_dataset_train_progress.set_postfix(
+                    Точность=f'{int(train_res[1] * 100) / 100}'
+                )
 
-        # Сохраняем веса, если они дают самую лучшую точность
-        if best_acc < np.mean(eval_acc):
-            best_acc = np.mean(eval_acc)
-            best_epoch = epoch
-            best_param = deepcopy(model.state_dict())
+            writer.add_scalar('accuracy/train', np.mean(train_acc), epoch)
+            writer.add_scalar('cross_entropy/train', np.mean(train_l), epoch)
 
-        # Если больше N эпох точность падает, сворачиваем лавочку
-        elif (epoch - best_epoch) > MAX_DEGRADATION_ALLOWED:
-            print('Модель безнадёжно деградировала, ехать дальше смысла нет.')
-            break
+            # Переходим к эвалюации...
+            model.eval()
+            eval_acc = []
+            eval_l = []
 
-    if best_param is not None:
-        model.load_state_dict(best_param)
+            for images, labels in batched_dataset_eval:
+                eval_res = model({'images': images, 'labels': labels, 'eval': True})
+                eval_acc.append(eval_res[1])
+                eval_l.append(eval_res[0].item())
 
-    return model
+                grid = make_grid(images)
+                writer.add_image('latest_batch/eval', grid, 0)
+
+            print(
+                f'Точность после эвалюации: {np.mean(eval_acc)} (лучшая: {best_acc})\n'
+            )
+            writer.add_scalar('accuracy/eval', np.mean(eval_acc), epoch)
+            writer.add_scalar('cross_entropy/eval', np.mean(eval_l), epoch)
+
+            # ...и обратно в трейн
+            model.train()
+            model.scheduler.step()
+
+            # Сохраняем веса, если они дают самую лучшую точность
+            if best_acc < np.mean(eval_acc):
+                best_acc = float(np.mean(eval_acc))
+                best_epoch = epoch
+                best_param = deepcopy(model.state_dict())
+
+            # Если больше N эпох точность падает, сворачиваем лавочку
+            elif (epoch - best_epoch) > MAX_DEGRADATION_ALLOWED:
+                print('\nМодель безнадёжно деградировала, ехать дальше смысла нет.')
+                writer.flush()
+                break
+        if best_param is not None:
+            model.load_state_dict(best_param)
+
+    # Это надо чтобы по Ctrl+C код сперва сохранил модель
+    except KeyboardInterrupt:
+        print('\nВыполняется досрочное прерывание обучения...')
+        if best_param is not None:
+            model.load_state_dict(best_param)
+
+    # В самом конце, записываем в тензорборд гиперпараметры и результаты
+    writer.add_hparams(
+        {'epochs': epochs, 'batch_size': batch_size, 'samples_size': samples_size},
+        {'hparam/final_accuracy': best_acc, 'hparam/final_epoch': best_epoch},
+    )
+
+    return model, best_acc, best_epoch + 1

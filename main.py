@@ -17,26 +17,19 @@ from visualize import visualize
 log = logging.getLogger(__name__)
 
 
-def model_name_format(path_checkpoint, model_date, e, bs, ss):
-    return f'{path_checkpoint}{model_date}-{e}-{bs}-{ss}.pt'
+def model_name_format(path_checkpoint, e, bs, ss, best_epoch, best_acc) -> str:
+    model_date = datetime.now().strftime('%y%m%d')
+    return (
+        f'{path_checkpoint}{model_date}_'
+        f'{e}-{bs}-{ss}_'
+        f'{best_epoch}-{best_acc:.4f}.pt'
+    )
 
 
 @hydra.main(version_base=None, config_path='config', config_name='config')
-def run(
-    # mode,
-    # e,
-    # bs,
-    # ss,  # Epochs, BatchSize, SampleSize
-    # params["path-labels"],
-    # params["path-splits"],
-    # params["path-checkpoint"],
-    # params["path-infers"],
-    # params["dataset-name"],
-    # params["dataset-splits"],
-    cfg: DictConfig,
-):
+def run(cfg: DictConfig):
     params = OmegaConf.to_container(cfg['params'])
-    print(params)
+    # print(params)
 
     # Для начала, скачем датасет! Если оный уже был скачан,
     # KaggleHub сам определит это и ничего перекачивать не будет.
@@ -76,7 +69,7 @@ def run(
                 ['train', 'eval'], params["path-splits"]
             )
 
-        model = model_train(
+        model, best_acc, best_epoch = model_train(
             train_samples,
             eval_samples,
             path_images,
@@ -86,13 +79,13 @@ def run(
             params["bs"],
         )
 
-        model_date = datetime.now().strftime('%y%m%d')
         model_name = model_name_format(
             params["path-checkpoint"],
-            model_date,
             params["e"],
             params["bs"],
             params["ss"],
+            best_epoch,
+            best_acc,
         )
 
         torch.save(model, model_name)
@@ -126,7 +119,7 @@ def run(
 
         if Path(params["path-infers"]).is_dir():
             image_pathes = [
-                file for file in Path(params["path-infers"]).iterdir() if file.is_file()
+                f for f in Path(params["path-infers"]).iterdir() if f.is_file()
             ]
 
             for image_path in image_pathes:

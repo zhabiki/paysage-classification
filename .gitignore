@@ -1,8 +1,8 @@
 **/__pycache__
-*.pyc
 .mypy_cache/*
 
-models/*
-# data/*
-!data/labels.txt # Названия классов по умолчанию
+models/*.pt # Разрешаем файлы DVC
+data/*.csv # Разрешаем файлы DVC и labels.txt
 pred/*
+runs/*
+!runs/.gitkeep # Т.к. ненастраиваемый каталог

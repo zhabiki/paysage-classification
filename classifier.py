@@ -62,7 +62,7 @@ class SceneClassifier(torch.nn.Module):
             accuracy = (torch.argmax(output, dim=1) == labels).sum().item() / len(
                 labels
             )
-            return accuracy
+            return (loss, accuracy)
 
         elif self.mode in ['eval', 'test']:
             # НЕ СЧИТАЕМ ГРАДИЕНТЫ В РЕЖИМАХ ЭВАЛЮАЦИИ И ТЕСТА
@@ -74,8 +74,10 @@ class SceneClassifier(torch.nn.Module):
                     probas = torch.nn.functional.softmax(logits, dim=1)
                     predicted_labels = torch.argmax(probas, dim=1)
 
+                    loss = self.criterion(logits, labels)
+
                     accuracy = (predicted_labels == labels).sum().item() / len(labels)
-                    return accuracy
+                    return (loss, accuracy)
 
                 except BaseException:
                     img = batch
