@@ -236,12 +236,14 @@ dependencies:
   - zstd=1.5.6=hc292b87_0
   - pip:
       - absl-py==2.3.1
+      - antlr4-python3-runtime==4.9.3
       - black==25.12.0
       - bleach==6.3.0
       - cfgv==3.5.0
       - distlib==0.4.0
       - flake8==7.3.0
       - grpcio==1.76.0
+      - hydra-core==1.3.2
       - identify==2.6.15
       - isort==7.0.0
       - joblib==1.5.2
@@ -252,6 +254,7 @@ dependencies:
       - mypy==1.19.1
       - mypy-extensions==1.1.0
       - nodeenv==1.10.0
+      - omegaconf==2.3.0
       - pathspec==1.0.1
       - platformdirs==4.5.1
       - pre-commit==4.5.1
@@ -269,4 +272,4 @@ dependencies:
       - virtualenv==20.35.4
       - webencodings==0.5.1
       - werkzeug==3.1.5
-prefix: /home/cesiumix/miniconda3/envs/paysage-classification
+prefix: /home/andrey/miniconda3/envs/paysage-classification
