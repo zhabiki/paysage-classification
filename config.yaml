@@ -1,5 +1,5 @@
 params:
-  mode: train # train, test, inference, visualiZe
+  mode: train # train, test, inference, visualize
   e: 100
   bs: 256
   ss: 88 # На слабых ПК лучше ставить не более 32
@@ -9,4 +9,4 @@ params:
   path-labels: data/labels.txt
   dataset-size: 397098665
   dataset-splits: 0.7-0.2-0.1 # суммарно д.б. = 1.0
-  infer-output: mpl # mpl (GUI) либо std (текст)
+  infer-output: std # mpl (GUI) либо std (текст)

@@ -4,15 +4,12 @@ from pathlib import Path
 
 import hydra
 import torch
+from dvc.repo import Repo
 from omegaconf import DictConfig, OmegaConf
 from torchvision import transforms
 
-from paysage_classification.dataset.downloader import check_dataset, download_dataset
-from paysage_classification.dataset.samples import (
-    create_splits,
-    read_samples,
-    read_splits,
-)
+from paysage_classification.dataset.samples import read_samples
+from paysage_classification.dataset.splitter import create_splits, read_splits
 from paysage_classification.inference import inference
 from paysage_classification.test import model_test, show_metrics
 from paysage_classification.train import model_train
@@ -33,7 +30,7 @@ def model_name_format(path_checkpoint, e, bs, ss, best_epoch, best_acc) -> str:
 @hydra.main(version_base=None, config_path='', config_name='config')
 def run(cfg: DictConfig):
     params = OmegaConf.to_container(cfg['params'])
-    # print(params)
+    # print(f'ВХОДНЫЕ АРГУМЕНТЫ: {params}\n')
 
     path_dataset = (
         Path(params['path-data']) / 'nitishabharathi/scene-classification/versions/1'
@@ -42,9 +39,18 @@ def run(cfg: DictConfig):
     path_csv = path_dataset / 'train-scene classification' / 'train.csv'
 
     # Для начала, скачем датасет! УИИИИИИИИИ
-    if not check_dataset(params['dataset-size'], path_dataset):
-        print('Датасет отсутствует или повреждён, скачивание с DVC...')
-        download_dataset()
+    if not (
+        Path(path_dataset).is_dir()
+        and params['dataset-size']
+        == sum(f.stat().st_size for f in Path(path_dataset).glob('**/*') if f.is_file())
+    ):
+        print('Датасет отсутствует или повреждён, попытка скачивания с DVC...')
+        try:
+            repo = Repo()
+            repo.pull()
+        except BaseException:
+            print('Не удалось получить датасет с DVC! Возможно, у вас нет доступа.')
+            exit(-1)
 
     # Считаем входные метки, чтобы не делать этого по многу раз
     labels_f = open(params['path-labels'], 'r', encoding='utf-8')
@@ -68,7 +74,6 @@ def run(cfg: DictConfig):
             [train_samples, eval_samples] = read_splits(
                 ['train', 'eval'], params['path-data']
             )
-
         except Exception:
             print('Файл сплитов не найден! Создаю новые...')
             create_splits(path_csv, params['dataset-splits'], params['path-data'])
@@ -117,7 +122,6 @@ def run(cfg: DictConfig):
     elif params['mode'] == 'visualize':
         # В случае с визуализацией, нас сплиты не интересуют
         samples = read_samples(path_csv)
-
         visualize(samples, path_images, labels_list, transform_list)
 
     elif params['mode'] == 'inference':
