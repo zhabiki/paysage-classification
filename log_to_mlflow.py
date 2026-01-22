@@ -2,6 +2,8 @@ import mlflow.pyfunc
 import torch
 import pandas as pd
 import os
+from paysage_classification.inference import inference
+
 
 # Описываем обертку
 class ModelWrapper(mlflow.pyfunc.PythonModel):
@@ -23,8 +25,6 @@ class ModelWrapper(mlflow.pyfunc.PythonModel):
         ])
 
     def predict(self, context, model_input):
-        import pandas as pd
-        from paysage_classification.inference import inference
         
         # Извлекаем путь к картинке
         if isinstance(model_input, pd.DataFrame):
@@ -50,9 +50,6 @@ class ModelWrapper(mlflow.pyfunc.PythonModel):
 
 # Запуск процесса логирования
 if __name__ == "__main__":
-    # Удаляем старые логи, если хочешь начать с чистого листа
-    # import shutil
-    # if os.path.exists("mlruns"): shutil.rmtree("mlruns")
 
     with mlflow.start_run() as run:
         mlflow.pyfunc.log_model(
