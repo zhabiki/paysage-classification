@@ -3,6 +3,7 @@
 .dvc/tmp
 .mypy_cache/*
 **/__pycache__
+mlflow.db
 
 models/*
 data/*
@@ -13,4 +14,5 @@ pred/*
 runs/*
 dist/*
 test_predict/*
+mlruns/*
 !runs/.gitkeep # Т.к. ненастраиваемый каталог
